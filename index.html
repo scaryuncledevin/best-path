@@ -1,0 +1,208 @@
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Angular Material style sheet -->
+    <link rel="stylesheet" href="bower_components/angular-material/angular-material.css">
+    <title>Best Path Calculator</title>
+    <style>
+        #destinations {
+            width:500px;
+        }
+    </style>
+</head>
+<body ng-app="BestPath" ng-cloak>
+
+    <div ng-controller="Mapper" layout="row" layout-fill>
+        <div md-whiteframe="3" id="destinations" layout-padding>
+            <div layout="row">
+                <md-input-container flex>
+                    <label>Starting Address</label>
+                    <input ng-model="startingPoint.address">
+                </md-input-container>
+            </div>
+
+            <div>
+                <md-checkbox ng-model="returnToStart">
+                    Return to starting point
+                </md-checkbox>
+            </div>
+
+            <div layout="row" ng-hide="returnToStart">
+                <md-input-container flex>
+                    <label>Ending Address</label>
+                    <input ng-model="endingPoint.address">
+                </md-input-container>
+            </div>
+
+            <div ng-repeat="(index, destination) in destinations" layout="row">
+                <md-input-container flex>
+                    <label>Destination {{index}}</label>
+                    <input ng-model="destination.address">
+                </md-input-container>
+            </div>
+
+            <div layout="row">
+                <md-button class="md-raised md-primary" ng-click="addDestination()">Add Destination</md-button>
+                <span flex></span>
+                <md-button class="md-raised md-primary" ng-click="calculateBestPath()">Calculate Best Path</md-button>
+            </div>
+
+            <pre>{{ getPoints() | json }}</pre>
+        </div>
+        <div flex layout-padding>
+            <md-content>
+                <pre>{{ bestPath | json }}</pre>
+
+                <md-list flex>
+                    <md-list-item ng-repeat="point in bestPath.path" ng-click="null">
+                        {{ getPoint(point) }}
+                    </md-list-item>
+                </md-list>
+            </md-content>
+        </div>
+    </div>
+
+    <script src="bower_components/angular/angular.js"></script>
+    <script src="bower_components/angular-animate/angular-animate.js"></script>
+    <script src="bower_components/angular-aria/angular-aria.js"></script>
+    <script src="bower_components/angular-messages/angular-messages.js"></script>
+    <script src="bower_components/angular-material/angular-material.js"></script>
+    <script src="bower_components/ngmap/build/scripts/ng-map.js"></script>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB08JtUjBe-Asts554g8RSFhiJ4AgOHU_U"></script>
+
+    <script type="text/javascript">
+    class Location {
+        constructor(data) {
+            this.address = (data || {}).address || "";
+        }
+    }
+
+    function permute(arr) {
+        let set = [];
+
+        if (arr.length <= 1) {
+            set.push(arr);
+        } else {
+            arr.forEach(function(current, index) {
+                let subArr = arr.slice();
+                subArr.splice(index, 1);
+                permute(subArr).forEach(function(subSet){
+                    set.push([current].concat(subSet));
+                })
+            });
+        }
+
+        return set;
+    }
+
+    angular.module('BestPath', ['ngMaterial'])
+    .controller('Mapper', function($scope){
+        $scope.startingPoint = new Location({
+            address:''
+        });
+
+        $scope.returnToStart = false
+
+        $scope.endingPoint = new Location({
+            address:''
+        });
+
+        $scope.destinations = [];
+
+        $scope.addDestination = function(address) {
+            $scope.destinations.push(new Location({address}));
+        }
+
+        let costs = {};
+        $scope.bestPath = {};
+
+        $scope.getPoint = function(point) {
+            let points = $scope.getPoints();
+
+            return points[point];
+        }
+
+        $scope.getPoints = function() {
+            let points = [];
+
+            points.push($scope.startingPoint.address);
+
+            if (!$scope.returnToStart) {
+                points.push($scope.endingPoint.address);
+            }
+
+            $scope.destinations.forEach(function(destination){
+                let address = destination.address.trim();
+                if (address.length > 0) {
+                    points.push(address);
+                }
+            });
+
+            return points;
+        }
+
+        $scope.calculateBestPath = function() {
+            let points = $scope.getPoints();
+
+            (new google.maps.DistanceMatrixService()).getDistanceMatrix({
+                origins:points,
+                destinations:points,
+                travelMode: 'DRIVING'
+            }, function(response, status){
+                costs = {};
+
+                let locations = [];
+
+                for(let fromIndex = 0; fromIndex < points.length; fromIndex++) {
+                    locations.push(fromIndex);
+
+                    let row = response.rows[fromIndex].elements;
+
+                    costs[fromIndex] = {};
+
+                    for(let toIndex = 0; toIndex < points.length; toIndex++) {
+                        if (fromIndex == toIndex) {
+                            continue;
+                        }
+
+                        costs[fromIndex][toIndex] = row[toIndex].duration.value;
+                    }
+                }
+
+                let start = locations.shift();
+                let end = start;
+                if (!$scope.returnToStart) {
+                    end = locations.shift();
+                }
+
+                $scope.bestPath = {
+                    path:null,
+                    cost:null
+                };
+
+                permute(locations).forEach(function(path){
+                    path = [start].concat(path).concat([end]);
+
+                    let cost = 0;
+                    let lastPoint = null;
+
+                    path.forEach(function(point){
+                        if (lastPoint != null) {
+                            cost += costs[lastPoint][point];
+                        }
+                        
+                        lastPoint = point;
+                    })
+
+                    if ($scope.bestPath.cost == null || cost < $scope.bestPath.cost) {
+                        $scope.bestPath = {path, cost};
+                    }
+                })
+            })
+        }
+    })
+    </script>
+
+</body>
+</html>

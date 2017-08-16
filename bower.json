@@ -1,0 +1,21 @@
+{
+  "name": "best-path",
+  "authors": [
+    "Devin Rodriguez <devin.rodriguez@igt.com>"
+  ],
+  "description": "",
+  "main": "",
+  "license": "MIT",
+  "homepage": "",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angular": "^1.6.5",
+    "angular-material": "^1.1.4"
+  }
+}
